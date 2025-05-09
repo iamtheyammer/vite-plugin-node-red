@@ -18,7 +18,7 @@ module.exports = function (RED: NodeAPI) {
       if (typeof msg.payload === "string") {
         msg.payload = msg.payload.toLowerCase();
       } else {
-        node.error("Input payload is not a string");
+        node.error(`Input payload is not a string`);
       }
 
       send(msg);

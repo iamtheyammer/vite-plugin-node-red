@@ -1,7 +1,8 @@
 import { promises as fs } from "fs";
 import * as path from "node:path";
 import merge from "lodash.merge";
-import type { Plugin, UserConfig } from "vite";
+import type { InlineConfig, Plugin, UserConfig } from "vite";
+import { build as viteBuild } from "vite";
 
 interface SimplePackageJson {
   name: string;
@@ -36,6 +37,22 @@ export interface VitePluginNodeRedOptions {
         // Copy the dependencies from the project package.json file.
         copyDependencies?: boolean;
       };
+  // Whether to run an additional Vite build to generate your nodes'
+  // "JavaScript files" (the code that runs in Node.js when your
+  // node executes as part of a flow).
+  //
+  // A boolean enables/disables this behavior using default options.
+  // If you would like to configure Vite more, you may pass Vite
+  // configuration options here. Note that some options, like
+  // `ssr` and some rollup options will be overridden - see the
+  // plugin's `closeBundle` method for details.
+  //
+  // If this option is disabled, the nodes will not be fully built as
+  // their JavaScript files will not exist in the output directory.
+  //
+  // Default: true
+  buildNodeJsFiles?: boolean | Partial<UserConfig>;
+  // If true, suppresses all warnings and non-error log messages.
   silent?: boolean;
 }
 
@@ -48,6 +65,7 @@ const defaultOptions: Required<VitePluginNodeRedOptions> = {
     copyPackageName: true,
   },
   silent: false,
+  buildNodeJsFiles: true,
 };
 
 export default async function nodeRedPlugin(
@@ -71,12 +89,26 @@ export default async function nodeRedPlugin(
     );
   }
 
+  // Node "JavaScript files" - we will generate these as part of an SSR
+  // build.
+  const nodeJsFiles: string[] = [];
+  // Vite's output directory - will be calculated during writeBundle.
+  // Used for the SSR build to generate the Node.js files.
+  let outDir: string;
+
   return {
     name: "vite-plugin-node-red",
-    async config(config): Promise<UserConfig | null> {
-      // If a nodesDirectory is not specified, the user must have configured
-      // Vite entry points on their own.
+    async config(config, { command }): Promise<UserConfig | null> {
+      if (command === "serve") {
+        // This plugin does not support running in serve mode.
+        throw new Error(
+          `Node-RED requires nodes to be compiled instead of served. Use \`vite build --watch\` instead of \`vite\`.`,
+        );
+      }
+
       if (!pluginOptions.nodesDirectory) {
+        // If a nodesDirectory is not specified, the user must have configured
+        // Vite entry points on their own.
         return null;
       }
 
@@ -108,20 +140,31 @@ export default async function nodeRedPlugin(
       const nodes: Record<string, string> = {};
 
       for (const subdir of subdirs) {
+        const contents = await fs.readdir(path.join(nodesDir, subdir), {
+          withFileTypes: true,
+        });
+        const files = new Set(
+          contents
+            .filter((dirent) => dirent.isFile())
+            .map((dirent) => dirent.name),
+        );
         // Ensure both the HTML and TS files exist.
-        const htmlFile = path.join(nodesDir, subdir, `${subdir}.html`);
-        const tsFile = path.join(nodesDir, subdir, `${subdir}.ts`);
 
-        try {
-          await Promise.all([fs.stat(htmlFile), fs.stat(tsFile)]);
-          nodes[subdir] = htmlFile;
-        } catch (err) {
+        if (
+          !files.has(`${subdir}.html`) ||
+          (!files.has(`${subdir}.ts`) && !files.has(`${subdir}.js`))
+        ) {
           if (!pluginOptions.silent) {
             console.warn(
-              `vite-plugin-node-red: Node ${subdir} is missing either the HTML or TS file. Skipping.`,
+              `vite-plugin-node-red: Node ${subdir} is missing either the HTML or JS/TS file. Skipping.`,
             );
           }
         }
+
+        nodes[subdir] = path.join(nodesDir, subdir, `${subdir}.html`);
+        nodeJsFiles.push(
+          files.has(`${subdir}.ts`) ? `${subdir}.ts` : `${subdir}.js`,
+        );
       }
 
       if (!pluginOptions.silent) {
@@ -136,6 +179,9 @@ export default async function nodeRedPlugin(
           rollupOptions: {
             input: nodes,
           },
+        },
+        ssr: {
+          target: "node",
         },
       };
     },
@@ -207,7 +253,7 @@ export default async function nodeRedPlugin(
       // Determine the output directory.
       // outputOptions.dir is used when multiple files are generated,
       // or outputOptions.file for single file builds.
-      const outDir =
+      outDir =
         outputOptions.dir ||
         (outputOptions.file ? path.dirname(outputOptions.file) : "dist");
       const outPackagePath = path.resolve(
@@ -226,6 +272,43 @@ export default async function nodeRedPlugin(
       } catch (err) {
         this.error(`Error writing package.json: ${err}`);
       }
+    },
+    async closeBundle() {
+      if (pluginOptions.buildNodeJsFiles === false || nodeJsFiles.length < 1) {
+        return;
+      }
+
+      const pluginViteConfig: InlineConfig = {
+        configFile: false,
+        ssr: {
+          target: "node",
+        },
+        build: {
+          emptyOutDir: false,
+          ssr: true,
+          outDir: outDir,
+          rollupOptions: {
+            input: nodeJsFiles,
+            output: {
+              format: "cjs",
+              preserveModules: true,
+              preserveModulesRoot: path.resolve(
+                path.join(pluginOptions.nodesDirectory, ".."),
+              ),
+            },
+          },
+        },
+      };
+
+      // Run a second Vite build, this time with ssr (to run in Node)
+      await viteBuild(
+        merge(
+          typeof pluginOptions.buildNodeJsFiles === "object"
+            ? pluginOptions.buildNodeJsFiles
+            : {},
+          pluginViteConfig,
+        ),
+      );
     },
   };
 }
