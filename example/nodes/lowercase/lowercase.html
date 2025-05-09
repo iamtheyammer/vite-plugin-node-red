@@ -1,0 +1,36 @@
+<!--
+This is the Node's "HTML file" that defines the node's UI.
+https://nodered.org/docs/creating-nodes/node-html
+
+It MUST be named the same as the node's name, and the same as the folder it's in.
+The "JavaScript file" (in this case, TypeScript), also must be in this folder and
+named the same as the folder and as this file.
+-->
+
+<!--
+Node definition: https://nodered.org/docs/creating-nodes/node-html#defining-a-node
+Using Rollup allows us to use ES6 modules in the browser.
+
+This is the code that will run in the UI when the node is added to the palette.
+-->
+<script type="module" src="definition.ts"></script>
+
+<!--
+Edit dialog: https://nodered.org/docs/creating-nodes/node-html#edit-dialog
+The edit dialog is a simple HTML form that allows the user to configure the node.
+-->
+<script type="text/html" data-template-name="lowercase">
+  <h1>Lowercase Node Settings</h1>
+  <p>(there's nothing here)</p>
+</script>
+
+<!--
+Help text: https://nodered.org/docs/creating-nodes/node-html#help-text
+This shows up when the user clicks for "help" on the node in the editor.
+-->
+<script type="text/html" data-help-name="lowercase">
+  <h1>Lowercase</h1>
+  <p>Simple node example that lowercases strings passed into it.
+    Payload must be a string.
+  </p>
+</script>
