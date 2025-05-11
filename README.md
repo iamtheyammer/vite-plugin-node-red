@@ -4,6 +4,8 @@ Vite plugin to build Node-RED nodes easily and quickly using Vite.
 
 Supports TypeScript and React out of the box. No configuration required.
 
+![NPM Version](https://img.shields.io/npm/v/vite-plugin-node-red)
+
 ## Quick Start
 
 1. `npm install vite vite-plugin-node-red --save-dev` (or use `yarn`, `pnpm`, etc.)
