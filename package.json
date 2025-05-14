@@ -2,7 +2,7 @@
   "name": "vite-plugin-node-red",
   "packageManager": "yarn@4.9.1",
   "author": "iamtheyammer",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Vite plugin for compiling Node-RED nodes",
   "repository": "https://github.com/iamtheyammer/vite-plugin-node-red",
   "license": "MIT",

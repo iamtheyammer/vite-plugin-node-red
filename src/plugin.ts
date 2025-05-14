@@ -163,11 +163,20 @@ export default async function nodeRedPlugin(
 
         nodes[subdir] = path.join(nodesDir, subdir, `${subdir}.html`);
         nodeJsFiles.push(
-          files.has(`${subdir}.ts`) ? `${subdir}.ts` : `${subdir}.js`,
+          files.has(`${subdir}.ts`)
+            ? path.join(nodesDir, subdir, `${subdir}.ts`)
+            : path.join(nodesDir, subdir, `${subdir}.js`),
         );
       }
 
       if (!pluginOptions.silent) {
+        if (config.build?.assetsDir && config.build.assetsDir !== "resources") {
+          throw new Error(
+            "vite-plugin-node-red: Overwrote your assetsDir option with 'resources'. " +
+              "If it is not 'resources', Node-RED will not make these files available in " +
+              "the node editor. Remove the assetsDir option from your Vite config.",
+          );
+        }
         console.warn(
           `vite-plugin-node-red: found ${subdirs.length} nodes in ${nodesDir}: ${JSON.stringify(nodes, null, 2)}`,
         );
@@ -176,6 +185,7 @@ export default async function nodeRedPlugin(
       // Add nodes' HTML files to the vite build
       return {
         build: {
+          assetsDir: "resources",
           rollupOptions: {
             input: nodes,
           },
@@ -192,10 +202,7 @@ export default async function nodeRedPlugin(
         ? referencePackageJson.name
         : pluginOptions.packageName;
       // replace all occurrences of /resources/nodes/ with /resources/
-      const re = new RegExp(
-        `(src|href)="(\\/resources\\/${pluginOptions.nodesDirectory})\\/resources\\/`,
-        "g",
-      );
+      const re = new RegExp(`(src|href)="\\/resources\\/`, "g");
       // drop that second "/resources/", replace nodes directory with package name
       return html.replace(re, `$1="/resources/${packageName}/`);
     },

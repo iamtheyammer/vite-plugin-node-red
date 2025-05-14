@@ -6,10 +6,10 @@ Supports TypeScript and React out of the box. No configuration required.
 
 ![NPM Version](https://img.shields.io/npm/v/vite-plugin-node-red)
 
-## Quick Start
+## Overview
 
 1. `npm install vite vite-plugin-node-red --save-dev` (or use `yarn`, `pnpm`, etc.)
-2. Create a `vite.config.ts` (or `.config.js`) file, and configure Vite
+2. Create a `vite.config.ts` (or `.config.js`) file, and add `vite-plugin-node-red` as a plugin. No other options are required if your nodes are in the `nodes` directory.
 3. Create a `tsconfig.json` file, and configure TypeScript (optional)
 4. `npm run vite build` or `yarn vite build` to build your nodes (add `--watch` to watch for changes)
 5. In your Node-RED install directory, `npm install /path-to-your-vite-output-directory` your Vite output directory as an NPM package. You can also use `npm link` to link your Vite output directory to your Node-RED install directory. **Make sure not to install your base project** - import the Vite output directory.
@@ -54,14 +54,14 @@ dist/
 │   ├── node1.js
 |-- node2/
 │   ├── node2.html
-│   ├── node2.js
+│   ├── node2.js 
 ├── ...
 |-- resources/
 │   ├── node1-[slug].js (bundled from node1/declaration.ts)
 │   ├── node2-[slug].js
 │   ├── modulepreload-polyfill-[slug].js (not always present)
 │   ├── ...
-|-- package.json (if packageJson is not false)
+|-- package.json
 ```
 
 Now, from your Node-RED install directory, you can run `npm install /path-to-your-vite-output-directory` or `npm link /path-to-your-vite-output-directory` to install your nodes into Node-RED.
@@ -74,7 +74,7 @@ In Node-RED, the "JavaScript file" contains the node's logic and is run from Nod
 
 These files are built automatically using Vite (in SSR mode).
 
-Imports to NPM packages are **not bundled**, but they are transpiled to CommonJS. Since `vite-plugin-node-red` reads your dependencies and copies them into the generated `package.json`, when you run `npm install` (or `npm link`) in your Node-RED install directory, NPM will know what your code depends on and install those packages.
+Unlike scripts linked from your HTML files, imports to NPM packages are **not bundled**. Since `vite-plugin-node-red` reads your dependencies and copies them into the generated `package.json`, when you run `npm install` (or `npm link`) in your Node-RED install directory, NPM will know what your code depends on and install those packages.
 
 ### [HTML Files](https://nodered.org/docs/creating-nodes/node-html)
 
@@ -90,7 +90,7 @@ To add a script that Vite will bundle, you can use the `<script>` tag with the `
 <script type="module" src="definition.tsx"></script>
 ```
 
-External dependencies **will be bundled** into the output file, so you can use any NPM package in your HTML file.
+External dependencies **will be bundled** into the output file, so you can use any NPM package in your HTML file. Since they are bundled, any dependencies from these files are **dev dependencies** - install them with `--save-dev` or `-D`. Only dependencies that are used in the "JavaScript file" (the one that runs in Node.js) should be installed as normal dependencies.
 
 This allows packages like React to work out of the box.
 
@@ -105,22 +105,16 @@ import { defineConfig } from "vite";
 import nodeRedPlugin from "vite-plugin-node-red";
 
 export default defineConfig({
-  base: "/resources/nodes/",
-  mode: "production",
-  build: {
-    sourcemap: true,
-    assetsDir: "resources",
-    outDir: "dist",
-  },
   plugins: [nodeRedPlugin({
-    // set options here. defaults will apply if not set
+    // set options here. defaults will apply if not set.
+    // object itself is optional, too.
   })],
 });
 ```
 
-This assumes that:
+No options are required, assuming that:
 
-- Your nodes are in `nodes/`
+- Your nodes are in `nodes/` (not `src/nodes/`, but just `nodes/`)
   - If not, set the `nodesDirectory` option
 - You are using Vite from your project's root directory, which has `package.json` in it
   - If not, set the `packageJson.path` option
@@ -131,15 +125,17 @@ This assumes that:
 
 The plugin generates:
 
-- Bundled `.js` files that your HTML files will load
-- Transpiled `.js` files 
-- `.html` files that point to your 
+- `.html` files for your nodes (in the browser)
+- Bundled `.js` files that your HTML files will load (in the browser)
+- Transpiled `.js` files (run in Node.js) that run when your nodes are run in a flow
 
 ## Settings
 
 Paths can be relative to the current directory (where `vite` is run) or absolute.
 
 ```ts
+import type { UserConfig } from "vite";
+
 export interface VitePluginNodeRedOptions {
   // Directory where your nodes are located.
   // Can be a relative or absolute path.
