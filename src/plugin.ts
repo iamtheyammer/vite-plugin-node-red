@@ -190,9 +190,6 @@ export default async function nodeRedPlugin(
             input: nodes,
           },
         },
-        ssr: {
-          target: "node",
-        },
       };
     },
     transformIndexHtml(html) {
